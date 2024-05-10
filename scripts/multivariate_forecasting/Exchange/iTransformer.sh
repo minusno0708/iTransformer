@@ -1,4 +1,5 @@
-export CUDA_VISIBLE_DEVICES=3
+#export CUDA_VISIBLE_DEVICES=3
+export LD_LIBRARY_PATH=/usr/lib/wsl/lib:$LD_LIBRARY_PATH
 
 model_name=iTransformer
 
