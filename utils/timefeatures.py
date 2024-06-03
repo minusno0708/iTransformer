@@ -18,6 +18,9 @@ import numpy as np
 import pandas as pd
 from pandas.tseries import offsets
 from pandas.tseries.frequencies import to_offset
+from pandas.tseries.offsets import DateOffset
+
+import math
 
 
 class TimeFeature:
@@ -86,6 +89,80 @@ class WeekOfYear(TimeFeature):
     def __call__(self, index: pd.DatetimeIndex) -> np.ndarray:
         return (index.isocalendar().week - 1) / 52.0 - 0.5
 
+class Year(TimeFeature):
+    """1900年から2100年までの値を[-0.5から0.5]に変換する"""
+
+    def __call__(self, index: pd.DatetimeIndex) -> np.ndarray:
+        return (index.year - 1900) / 200.0 - 0.5
+
+
+class SCSecondOfMinute(TimeFeature):
+    """Minute of hour encoded as value between [-0.5, 0.5] translated by sin and cos"""
+
+    def __call__(self, index: pd.DatetimeIndex) -> np.ndarray:
+        period = index.second / 59.0 * (2*math.pi)
+        return [np.sin(period)/2, np.cos(period)/2]
+
+
+class SCMinuteOfHour(TimeFeature):
+    """Minute of hour encoded as value between [-0.5, 0.5] translated by sin and cos"""
+
+    def __call__(self, index: pd.DatetimeIndex) -> np.ndarray:
+        period = index.minute / 59.0 * (2*math.pi)
+        return [np.sin(period)/2, np.cos(period)/2]
+
+
+class SCHourOfDay(TimeFeature):
+    """Hour of day encoded as value between [-0.5, 0.5] translated by sin and cos"""
+
+    def __call__(self, index: pd.DatetimeIndex) -> np.ndarray:
+        period = index.hour / 23.0 * (2*math.pi)
+        return [np.sin(period)/2, np.cos(period)/2]
+
+
+class SCDayOfWeek(TimeFeature):
+    """Hour of day encoded as value between [-0.5, 0.5] translated by sin and cos"""
+
+    def __call__(self, index: pd.DatetimeIndex) -> np.ndarray:
+        period = index.dayofweek / 6.0 * (2*math.pi)
+        return [np.sin(period)/2, np.cos(period)/2]
+
+
+class SCDayOfMonth(TimeFeature):
+    """Day of month encoded as value between [-0.5, 0.5] translated by sin and cos"""
+
+    def __call__(self, index: pd.DatetimeIndex) -> np.ndarray:
+        period = (index.day - 1) / 30.0 * (2*math.pi)
+        return [np.sin(period)/2, np.cos(period)/2]
+
+
+class SCDayOfYear(TimeFeature):
+    """Day of year encoded as value between [-0.5, 0.5] translated by sin and cos"""
+
+    def __call__(self, index: pd.DatetimeIndex) -> np.ndarray:
+        period = (index.dayofyear - 1) / 365.0 * (2*math.pi)
+        return [np.sin(period)/2, np.cos(period)/2]
+
+
+class SCMonthOfYear(TimeFeature):
+    """Month of year encoded as value between [-0.5, 0.5] translated by sin and cos"""
+
+    def __call__(self, index: pd.DatetimeIndex) -> np.ndarray:
+        period = (index.month - 1) / 11.0 * (2*math.pi)
+        return [np.sin(period)/2, np.cos(period)/2]
+
+
+class SCWeekOfYear(TimeFeature):
+    """Week of year encoded as value between [-0.5, 0.5] translated by sin and cos"""
+
+    def __call__(self, index: pd.DatetimeIndex) -> np.ndarray:
+        period = (index.isocalendar().week - 1) / 52.0 * (2*math.pi)
+        return [np.sin(period)/2, np.cos(period)/2]
+
+class WeatherOffset(DateOffset):
+    def __init__(self):
+        super().__init__()
+
 
 def time_features_from_frequency_str(freq_str: str) -> List[TimeFeature]:
     """
@@ -119,9 +196,20 @@ def time_features_from_frequency_str(freq_str: str) -> List[TimeFeature]:
             DayOfMonth,
             DayOfYear,
         ],
+        WeatherOffset: [
+            SCHourOfDay,
+            SCDayOfWeek,
+            SCDayOfMonth,
+            SCDayOfYear
+        ]
     }
+    freq_str = "Weather"
 
-    offset = to_offset(freq_str)
+    if freq_str == "Weather":
+        offset = WeatherOffset()
+    else:
+        offset = to_offset(freq_str)
+
 
     for offset_type, feature_classes in features_by_offsets.items():
         if isinstance(offset, offset_type):
