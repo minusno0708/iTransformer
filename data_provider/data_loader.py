@@ -5,6 +5,7 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 from sklearn.preprocessing import StandardScaler
 from utils.timefeatures import time_features
+from utils.timefeatures_cyclized import time_features_cyclized
 import warnings
 
 warnings.filterwarnings('ignore')
@@ -225,15 +226,34 @@ class Dataset_Custom(Dataset):
         '''
         df_raw.columns: ['date', ...(other features), target feature]
         '''
+
         cols = list(df_raw.columns)
         cols.remove(self.target)
         cols.remove('date')
+
+        #cols = cols[10:]
+        # [0.3156993] [0.14097777] [0.10539924] [:10]
+        # [0.72235662] [0.71157843] [0.23758578] [:10]
+
         df_raw = df_raw[['date'] + cols + [self.target]]
-        num_train = int(len(df_raw) * 0.7)
-        num_test = int(len(df_raw) * 0.2)
-        num_vali = len(df_raw) - num_train - num_test
-        border1s = [0, num_train - self.seq_len, len(df_raw) - num_test - self.seq_len]
-        border2s = [num_train, num_train + num_vali, len(df_raw)]
+       
+        start_len = int(len(df_raw) * 0.0)
+        end_len = int(len(df_raw) * 0.7)
+
+        num_train = int((end_len - start_len) * 0.7)
+        num_test = int((end_len - start_len) * 0.2)
+        num_vali = (end_len - start_len) - num_train - num_test
+
+        print("num train", num_train)
+        print("num test", num_test)
+        print("num vali", num_vali)
+
+        border1s = [start_len, num_train - self.seq_len + start_len, end_len - num_test - self.seq_len]
+        border2s = [num_train + start_len, num_train + num_vali + start_len, end_len]
+
+        print("border1s", border1s)
+        print("border2s", border2s)
+
         border1 = border1s[self.set_type]
         border2 = border2s[self.set_type]
 
@@ -246,6 +266,11 @@ class Dataset_Custom(Dataset):
         if self.scale:
             train_data = df_data[border1s[0]:border2s[0]]
             self.scaler.fit(train_data.values)
+
+            print("Source data")
+            print(type(df_data.values))
+            print(df_data.values.shape)
+
             data = self.scaler.transform(df_data.values)
         else:
             data = df_data.values
