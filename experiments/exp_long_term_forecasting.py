@@ -137,7 +137,6 @@ class Results_Inverser():
         fig, ax = plt.subplots(7, 3)
 
         for i, pred_i, true_i in zip(range(self.pred.shape[1]), self.pred.T, self.true.T):
-            print(i)
             ax[int(i/3), i%3].plot(pred_i, label="pred")
             ax[int(i/3), i%3].plot(true_i, label="true")
 
@@ -176,7 +175,7 @@ class Exp_Long_Term_Forecast(Exp_Basic):
         criterion = nn.MSELoss()
         return criterion
 
-    def vali(self, vali_data, vali_loader, criterion, loss_analyzer=None):
+    def vali(self, vali_data, vali_loader, criterion, loss_analyzer=None, scaler=None):
         total_loss = []
         self.model.eval()
         with torch.no_grad():
@@ -234,6 +233,10 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                 loss = criterion(pred, true)
 
                 total_loss.append(loss)
+
+            if scaler != None:
+                test_output = Results_Inverser(pred[0].numpy(), true[0].numpy(), scaler)
+                test_output.write(f"results/pred_true/vali.jpg")
 
         total_loss = np.average(total_loss)
         
@@ -343,8 +346,8 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                 pred = outputs.detach().cpu()
                 true = batch_y.detach().cpu()
 
-                train_output = Results_Inverser(pred[0].numpy(), true[0].numpy(), train_data.scaler)
-                train_output.write(f"results/pred_true/output.jpg")
+            train_output = Results_Inverser(pred[0].numpy(), true[0].numpy(), train_data.scaler)
+            train_output.write(f"results/pred_true/train.jpg")
 
             pred_t = pred.permute(0, 2, 1).numpy()
             true_t = true.permute(0, 2, 1).numpy()
@@ -355,7 +358,7 @@ class Exp_Long_Term_Forecast(Exp_Basic):
             print("Epoch: {} cost time: {}".format(epoch + 1, time.time() - epoch_time))
             train_loss = np.average(train_loss)
             vali_loss = self.vali(vali_data, vali_loader, criterion)  
-            test_loss = self.vali(test_data, test_loader, criterion, loss_analyzer)
+            test_loss = self.vali(test_data, test_loader, criterion, loss_analyzer, test_data.scaler)
 
             # Lossを記録
             loss_analyzer.loss_append('train', train_loss)
