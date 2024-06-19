@@ -6,12 +6,19 @@ import random
 import numpy as np
 
 if __name__ == '__main__':
-    fix_seed = 2023
-    random.seed(fix_seed)
-    torch.manual_seed(fix_seed)
-    np.random.seed(fix_seed)
+    #fix_seed = 0
+    #fix_seed = 1
+    #fix_seed = 2
+    #fix_seed = 3
+    #fix_seed = 4
+
+    #random.seed(fix_seed)
+    #torch.manual_seed(fix_seed)
+    #np.random.seed(fix_seed)
 
     parser = argparse.ArgumentParser(description='iTransformer')
+
+    parser.add_argument('--seed', type=int, default=2023, help='random seed')
 
     # basic config
     parser.add_argument('--is_training', type=int, required=True, default=1, help='status')
@@ -88,6 +95,18 @@ if __name__ == '__main__':
                                                                            'you can select [partial_start_index, min(enc_in + partial_start_index, N)]')
 
     args = parser.parse_args()
+    
+    try:
+        fix_seed = args.seed
+    except AttributeError:
+        fix_seed = 0
+    
+    random.seed(fix_seed)
+    torch.manual_seed(fix_seed)
+    np.random.seed(fix_seed)
+
+    print('fix_seed:', fix_seed)
+    
     args.use_gpu = True if torch.cuda.is_available() and args.use_gpu else False
 
     if args.use_gpu and args.use_multi_gpu:

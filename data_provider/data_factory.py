@@ -1,5 +1,5 @@
 from data_provider.data_loader import Dataset_ETT_hour, Dataset_ETT_minute, Dataset_Custom, Dataset_Solar, Dataset_PEMS, \
-    Dataset_Pred
+    Dataset_Pred, Dataset_Custom_Sliding_Window
 from torch.utils.data import DataLoader
 
 data_dict = {
@@ -10,14 +10,15 @@ data_dict = {
     'Solar': Dataset_Solar,
     'PEMS': Dataset_PEMS,
     'custom': Dataset_Custom,
+    #'custom': Dataset_Custom_Sliding_Window,
 }
 
 
-def data_provider(args, flag):
+def data_provider(args, flag, order):
     Data = data_dict[args.data]
     timeenc = 0 if args.embed != 'timeF' else 1
 
-    if flag == 'test':
+    if flag == 'val':
         shuffle_flag = False
         drop_last = True
         batch_size = 1  # bsz=1 for evaluation
@@ -43,6 +44,7 @@ def data_provider(args, flag):
         target=args.target,
         timeenc=timeenc,
         freq=freq,
+        #order=order,
     )
     print(flag, len(data_set))
     data_loader = DataLoader(

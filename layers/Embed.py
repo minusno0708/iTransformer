@@ -137,7 +137,28 @@ class DataEmbedding_inverted(nn.Module):
             x = self.value_embedding(x)
         else:
             # the potential to take covariates (e.g. timestamps) as tokens
-            x = self.value_embedding(torch.cat([x, x_mark.permute(0, 2, 1)], 1)) 
+            x = self.value_embedding(torch.cat([x, x_mark.permute(0, 2, 1)], 1))
+        # x: [Batch Variate d_model]
+        return self.dropout(x)
+
+class DataEmbedding_inverted_potentialized(nn.Module):
+    def __init__(self, c_in, d_model, embed_type='fixed', freq='h', dropout=0.1):
+        super(DataEmbedding_inverted_potentialized, self).__init__()
+        self.value_embedding = nn.Linear(c_in, d_model)
+        self.dropout = nn.Dropout(p=dropout)
+
+    def forward(self, x, x_mark):
+        x = x.permute(0, 2, 1)
+        # x: [Batch Variate Time]
+        if x_mark is None:
+            x = self.value_embedding(x)
+        else:
+            # the potential to take covariates (e.g. timestamps) as tokens
+            x_mark_transformed = 2 * math.pi * (x_mark + 0.5)
+            x_mark_sin = torch.sin(x_mark_transformed)
+            x_mark_cos = torch.cos(x_mark_transformed)
+            x_mark_combined = torch.cat([x_mark_sin, x_mark_cos], dim=-1)
+            x = self.value_embedding(torch.cat([x, x_mark_combined.permute(0, 2, 1)], 1))
         # x: [Batch Variate d_model]
         return self.dropout(x)
 

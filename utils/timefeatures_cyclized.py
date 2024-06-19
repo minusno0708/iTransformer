@@ -32,64 +32,68 @@ class TimeFeature:
         return self.__class__.__name__ + "()"
 
 
-class SecondOfMinute(TimeFeature):
-    """Minute of hour encoded as value between [-0.5, 0.5]"""
+class SCSecondOfMinute(TimeFeature):
+    """Minute of hour encoded as value between [-0.5, 0.5] translated by sin and cos"""
 
     def __call__(self, index: pd.DatetimeIndex) -> np.ndarray:
-        return index.second / 59.0 - 0.5
+        period = index.second / 59.0 * (2*math.pi)
+        return [np.sin(period)/2, np.cos(period)/2]
 
 
-class MinuteOfHour(TimeFeature):
-    """Minute of hour encoded as value between [-0.5, 0.5]"""
+class SCMinuteOfHour(TimeFeature):
+    """Minute of hour encoded as value between [-0.5, 0.5] translated by sin and cos"""
 
     def __call__(self, index: pd.DatetimeIndex) -> np.ndarray:
-        return index.minute / 59.0 - 0.5
+        period = index.minute / 59.0 * (2*math.pi)
+        return [np.sin(period)/2, np.cos(period)/2]
 
 
-class HourOfDay(TimeFeature):
-    """Hour of day encoded as value between [-0.5, 0.5]"""
+class SCHourOfDay(TimeFeature):
+    """Hour of day encoded as value between [-0.5, 0.5] translated by sin and cos"""
 
     def __call__(self, index: pd.DatetimeIndex) -> np.ndarray:
         period = index.hour / 23.0 * (2*math.pi)
         return [np.sin(period)/2, np.cos(period)/2]
 
 
-class DayOfWeek(TimeFeature):
-    """Hour of day encoded as value between [-0.5, 0.5]"""
+class SCDayOfWeek(TimeFeature):
+    """Hour of day encoded as value between [-0.5, 0.5] translated by sin and cos"""
 
     def __call__(self, index: pd.DatetimeIndex) -> np.ndarray:
         period = index.dayofweek / 6.0 * (2*math.pi)
         return [np.sin(period)/2, np.cos(period)/2]
 
 
-class DayOfMonth(TimeFeature):
-    """Day of month encoded as value between [-0.5, 0.5]"""
+class SCDayOfMonth(TimeFeature):
+    """Day of month encoded as value between [-0.5, 0.5] translated by sin and cos"""
 
     def __call__(self, index: pd.DatetimeIndex) -> np.ndarray:
         period = (index.day - 1) / 30.0 * (2*math.pi)
         return [np.sin(period)/2, np.cos(period)/2]
 
 
-class DayOfYear(TimeFeature):
-    """Day of year encoded as value between [-0.5, 0.5]"""
+class SCDayOfYear(TimeFeature):
+    """Day of year encoded as value between [-0.5, 0.5] translated by sin and cos"""
 
     def __call__(self, index: pd.DatetimeIndex) -> np.ndarray:
         period = (index.dayofyear - 1) / 365.0 * (2*math.pi)
         return [np.sin(period)/2, np.cos(period)/2]
 
 
-class MonthOfYear(TimeFeature):
-    """Month of year encoded as value between [-0.5, 0.5]"""
+class SCMonthOfYear(TimeFeature):
+    """Month of year encoded as value between [-0.5, 0.5] translated by sin and cos"""
 
     def __call__(self, index: pd.DatetimeIndex) -> np.ndarray:
-        return (index.month - 1) / 11.0 - 0.5
+        period = (index.month - 1) / 11.0 * (2*math.pi)
+        return [np.sin(period)/2, np.cos(period)/2]
 
 
-class WeekOfYear(TimeFeature):
-    """Week of year encoded as value between [-0.5, 0.5]"""
+class SCWeekOfYear(TimeFeature):
+    """Week of year encoded as value between [-0.5, 0.5] translated by sin and cos"""
 
     def __call__(self, index: pd.DatetimeIndex) -> np.ndarray:
-        return (index.isocalendar().week - 1) / 52.0 - 0.5
+        period = (index.isocalendar().week - 1) / 52.0 * (2*math.pi)
+        return [np.sin(period)/2, np.cos(period)/2]
 
 
 def time_features_from_frequency_str(freq_str: str) -> List[TimeFeature]:
@@ -109,7 +113,6 @@ def time_features_from_frequency_str(freq_str: str) -> List[TimeFeature]:
         offsets.Day: [DayOfWeek, DayOfMonth, DayOfYear],
         offsets.BusinessDay: [DayOfWeek, DayOfMonth, DayOfYear],
         offsets.Hour: [HourOfDay, DayOfWeek, DayOfMonth, DayOfYear],
-        #offsets.Hour: [DayOfWeek, DayOfMonth, DayOfYear],
         offsets.Minute: [
             MinuteOfHour,
             HourOfDay,

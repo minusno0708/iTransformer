@@ -6,7 +6,7 @@ import sys
 
 from datetime import datetime
 
-download_dir = "results/data_transitions/"
+download_dir = "results/raw_data/weather"
 
 divide_rate = [0.7, 0.1, 0.2]
 

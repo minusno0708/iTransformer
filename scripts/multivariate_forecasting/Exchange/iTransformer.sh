@@ -22,6 +22,9 @@ python -u run.py \
   --d_ff 128 \
   --itr 1
 
+
+<< OUTCOMMENT
+
 python -u run.py \
   --is_training 1 \
   --root_path ./dataset/exchange_rate/ \
@@ -79,3 +82,5 @@ python -u run.py \
   --d_model 128 \
   --d_ff 128 \
   --itr 1
+
+OUTCOMMENT

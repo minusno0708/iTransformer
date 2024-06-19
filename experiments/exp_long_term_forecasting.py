@@ -7,6 +7,7 @@ import torch.nn as nn
 from torch import optim
 import os
 import time
+import copy
 import warnings
 import numpy as np
 
@@ -14,11 +15,32 @@ import matplotlib.pyplot as plt
 
 warnings.filterwarnings('ignore')
 
-weather_columns = ['p (mbar)', 'T (degC)', 'Tpot (K)', 'Tdew (degC)', 'rh (%)',
-       'VPmax (mbar)', 'VPact (mbar)', 'VPdef (mbar)', 'sh (g/kg)',
-       'H2OC (mmol/mol)', 'rho (g/m**3)', 'wv (m/s)', 'max. wv (m/s)',
-       'wd (deg)', 'rain (mm)', 'raining (s)', 'SWDR (W/m�)',
-       'PAR (�mol/m�/s)', 'max. PAR (�mol/m�/s)', 'Tlog (degC)', 'OT']
+
+data_columns = []
+model_name = ""
+
+verification = "1_4_2_2"
+
+is_write_details = False
+mult_var_graph_dim = [4, 2]
+
+def set_model_name(name):
+    global model_name
+    model_name = name
+
+def set_columns(columns):
+    global data_columns
+    data_columns = columns
+
+def set_verification(verify):
+    global verification
+    base_vertification = "sliding_window_"
+    verification = base_vertification + verify
+    print(verification)
+
+def make_dir(path):
+    if not os.path.exists(path):
+        os.makedirs(path)
 
 class Loss_Analyzer():
     def __init__(self):
@@ -62,10 +84,18 @@ class Loss_Analyzer():
             print("Test Details: ", self.test_details)
             print("shape: ", self.test_details.shape)
 
-    def write_loss(self, path, title=""):
-        plt.plot(self.train_loss, label='Train Loss')
-        plt.plot(self.vali_loss, label='Vali Loss')
-        plt.plot(self.test_loss, label='Test Loss')
+    def write_loss(self, title=""):
+        path = f"results/{model_name}/loss/{verification}.jpg"
+        make_dir(f"results/{model_name}/loss")
+
+        epochs = np.arange(1, self.train_loss.shape[0] + 1)
+
+        plt.plot(epochs, self.train_loss, label='Train Loss')
+        plt.plot(epochs, self.vali_loss, label='Vali Loss')
+        plt.plot(epochs, self.test_loss, label='Test Loss')
+
+        plt.xlabel('Epochs')
+        plt.ylabel('Loss')
 
         if title != "":
             plt.title(title) 
@@ -73,16 +103,21 @@ class Loss_Analyzer():
         plt.legend()
         plt.savefig(path)
 
-    def write_details(self, path, title=""):
-        fig, ax = plt.subplots(7, 3)
+    def is_write_detailss(self, title=""):
+        path = f"results/{model_name}/loss_details/{verification}.jpg"
+        make_dir(f"results/{model_name}/loss_details")
+
+        fig, ax = plt.subplots(mult_var_graph_dim[0], mult_var_graph_dim[1])
         for i, train, test in zip(range(self.train_details.shape[0]), self.train_details, self.test_details):
-            ax[int(i/3), i%3].plot(train, label="Train")
-            ax[int(i/3), i%3].plot(test, label="Test")
+            epochs = np.arange(1, train.shape[0] + 1)
 
-            ax[int(i/3), i%3].set_title(f"[{str(i+1)}]{weather_columns[i]}", fontsize=6, x=0.5, y=0.6)
+            ax[int(i/mult_var_graph_dim[1]), i%mult_var_graph_dim[1]].plot(epochs, train, label="Train")
+            ax[int(i/mult_var_graph_dim[1]), i%mult_var_graph_dim[1]].plot(epochs, test, label="Test")
 
-            ax[int(i/3), i%3].tick_params(axis='x', labelsize=6)
-            ax[int(i/3), i%3].tick_params(axis='y', labelsize=6)
+            ax[int(i/mult_var_graph_dim[1]), i%mult_var_graph_dim[1]].set_title(f"[{str(i+1)}]{data_columns[i]}", fontsize=6, x=0.5, y=0.6)
+
+            ax[int(i/mult_var_graph_dim[1]), i%mult_var_graph_dim[1]].tick_params(axis='x', labelsize=6)
+            ax[int(i/mult_var_graph_dim[1]), i%mult_var_graph_dim[1]].tick_params(axis='y', labelsize=6)
         plt.legend(bbox_to_anchor=(0.8, 0), loc='upper left', borderaxespad=0, fontsize=10)
     
         if title != "":
@@ -103,16 +138,16 @@ class Loss_Analyzer():
 
         for j in range(len(pred)):
 
-            fig, ax = plt.subplots(7, 3)
+            fig, ax = plt.subplots(mult_var_graph_dim[0], mult_var_graph_dim[1])
 
             for i in range(len(pred_t)):
-                ax[int(i/3), i%3].plot(pred[j, i], label="pred")
-                ax[int(i/3), i%3].plot(true[j, i], label="true")
+                ax[int(i/mult_var_graph_dim[1]), i%mult_var_graph_dim[1]].plot(pred[j, i], label="pred")
+                ax[int(i/mult_var_graph_dim[1]), i%mult_var_graph_dim[1]].plot(true[j, i], label="true")
 
-                ax[int(i/3), i%3].set_title(f"[{str(i+1)}]{weather_columns[i]}", fontsize=6, x=0.5, y=0.6)
+                ax[int(i/mult_var_graph_dim[1]), i%mult_var_graph_dim[1]].set_title(f"[{str(i+1)}]{data_columns[i]}", fontsize=6, x=0.5, y=0.6)
 
-                ax[int(i/3), i%3].tick_params(axis='x', labelsize=6)
-                ax[int(i/3), i%3].tick_params(axis='y', labelsize=6)
+                ax[int(i/mult_var_graph_dim[1]), i%mult_var_graph_dim[1]].tick_params(axis='x', labelsize=6)
+                ax[int(i/mult_var_graph_dim[1]), i%mult_var_graph_dim[1]].tick_params(axis='y', labelsize=6)
             plt.legend(bbox_to_anchor=(0.8, 0), loc='upper left', borderaxespad=0, fontsize=10)
 
             filename = f"{j}.jpg"
@@ -133,17 +168,20 @@ class Results_Inverser():
         self.pred = self.scaler.inverse_transform(self.pred)
         self.true = self.scaler.inverse_transform(self.true)
 
-    def write(self, path, title=""):
-        fig, ax = plt.subplots(7, 3)
+    def write(self, flag, title=""):
+        make_dir(f"results/{model_name}/results_invert")
+        path = f"results/{model_name}/results_invert/{verification}_{flag}.jpg"
+
+        fig, ax = plt.subplots(mult_var_graph_dim[0], mult_var_graph_dim[1])
 
         for i, pred_i, true_i in zip(range(self.pred.shape[1]), self.pred.T, self.true.T):
-            ax[int(i/3), i%3].plot(pred_i, label="pred")
-            ax[int(i/3), i%3].plot(true_i, label="true")
+            ax[int(i/mult_var_graph_dim[1]), i%mult_var_graph_dim[1]].plot(pred_i, label="pred")
+            ax[int(i/mult_var_graph_dim[1]), i%mult_var_graph_dim[1]].plot(true_i, label="true")
 
-            ax[int(i/3), i%3].set_title(f"[{str(i+1)}]{weather_columns[i]}", fontsize=6, x=0.5, y=0.6)
+            ax[int(i/mult_var_graph_dim[1]), i%mult_var_graph_dim[1]].set_title(f"[{str(i+1)}]{data_columns[i]}", fontsize=6, x=0.5, y=0.6)
 
-            ax[int(i/3), i%3].tick_params(axis='x', labelsize=6)
-            ax[int(i/3), i%3].tick_params(axis='y', labelsize=6)
+            ax[int(i/mult_var_graph_dim[1]), i%mult_var_graph_dim[1]].tick_params(axis='x', labelsize=6)
+            ax[int(i/mult_var_graph_dim[1]), i%mult_var_graph_dim[1]].tick_params(axis='y', labelsize=6)
         plt.legend(bbox_to_anchor=(0.8, 0), loc='upper left', borderaxespad=0, fontsize=10)
 
         if title != "":
@@ -155,6 +193,7 @@ class Results_Inverser():
 class Exp_Long_Term_Forecast(Exp_Basic):
     def __init__(self, args):
         super(Exp_Long_Term_Forecast, self).__init__(args)
+        set_model_name(args.model_id)
 
     def _build_model(self):
         model = self.model_dict[self.args.model].Model(self.args).float()
@@ -163,8 +202,8 @@ class Exp_Long_Term_Forecast(Exp_Basic):
             model = nn.DataParallel(model, device_ids=self.args.device_ids)
         return model
 
-    def _get_data(self, flag):
-        data_set, data_loader = data_provider(self.args, flag)
+    def _get_data(self, flag, order=None):
+        data_set, data_loader = data_provider(self.args, flag, order)
         return data_set, data_loader
 
     def _select_optimizer(self):
@@ -234,9 +273,9 @@ class Exp_Long_Term_Forecast(Exp_Basic):
 
                 total_loss.append(loss)
 
-            if scaler != None:
-                test_output = Results_Inverser(pred[0].numpy(), true[0].numpy(), scaler)
-                test_output.write(f"results/pred_true/vali.jpg")
+        if scaler != None:
+            test_output = Results_Inverser(pred[0].numpy(), true[0].numpy(), scaler)
+            test_output.write("test")
 
         total_loss = np.average(total_loss)
         
@@ -244,9 +283,14 @@ class Exp_Long_Term_Forecast(Exp_Basic):
         return total_loss
 
     def train(self, setting):
+        make_dir(f"results/{model_name}")
+
         train_data, train_loader = self._get_data(flag='train')
         vali_data, vali_loader = self._get_data(flag='val')
         test_data, test_loader = self._get_data(flag='test')
+
+        if is_write_details:
+            set_columns(train_data.columns)
 
         loss_analyzer = Loss_Analyzer()
 
@@ -347,25 +391,28 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                 true = batch_y.detach().cpu()
 
             train_output = Results_Inverser(pred[0].numpy(), true[0].numpy(), train_data.scaler)
-            train_output.write(f"results/pred_true/train.jpg")
+            if is_write_details:
+                train_output.write("train")
 
             pred_t = pred.permute(0, 2, 1).numpy()
             true_t = true.permute(0, 2, 1).numpy()
 
-            diff_t = loss_analyzer.get_detail_loss(pred_t, true_t)
-            loss_analyzer.details_append('train', diff_t)
+            if is_write_details:
+                diff_t = loss_analyzer.get_detail_loss(pred_t, true_t)
+                loss_analyzer.details_append('train', diff_t)
 
             print("Epoch: {} cost time: {}".format(epoch + 1, time.time() - epoch_time))
             train_loss = np.average(train_loss)
             vali_loss = self.vali(vali_data, vali_loader, criterion)  
-            test_loss = self.vali(test_data, test_loader, criterion, loss_analyzer, test_data.scaler)
+            if is_write_details:
+                test_loss = self.vali(test_data, test_loader, criterion, loss_analyzer, test_data.scaler)
+            else:
+                test_loss = self.vali(test_data, test_loader, criterion)
 
             # Lossを記録
             loss_analyzer.loss_append('train', train_loss)
             loss_analyzer.loss_append('vali', vali_loss)
             loss_analyzer.loss_append('test', test_loss)
-
-            loss_analyzer.print_loss()
 
             print("Epoch: {0}, Steps: {1} | Train Loss: {2:.7f} Vali Loss: {3:.7f} Test Loss: {4:.7f}".format(
                 epoch + 1, train_steps, train_loss, vali_loss, test_loss))
@@ -391,8 +438,10 @@ class Exp_Long_Term_Forecast(Exp_Basic):
             epoch + 1, train_steps, train_loss, vali_loss, test_loss) + '\n')
         f.close()
 
-        loss_analyzer.write_loss('results/' + setting + "_remove_0.1" + '.jpg')
-        loss_analyzer.write_details('results/' + setting + "_remove_0.1" + '_details.jpg')
+        loss_write_path = 'results/weather_day_pred/automn'
+        loss_analyzer.write_loss()
+        if is_write_details:
+            loss_analyzer.is_write_detailss()
 
         return self.model
 

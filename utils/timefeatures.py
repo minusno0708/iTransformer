@@ -112,6 +112,14 @@ class SCMinuteOfHour(TimeFeature):
         return [np.sin(period)/2, np.cos(period)/2]
 
 
+class SCMinuteOfDay(TimeFeature):
+    """Minute of day encoded as value between [-0.5, 0.5] translated by sin and cos"""
+
+    def __call__(self, index: pd.DatetimeIndex) -> np.ndarray:
+        period = (index.hour*60 + index.minute) / 1439.0 * (2*math.pi)
+        return [np.sin(period)/2, np.cos(period)/2]
+
+
 class SCHourOfDay(TimeFeature):
     """Hour of day encoded as value between [-0.5, 0.5] translated by sin and cos"""
 
@@ -140,7 +148,9 @@ class SCDayOfYear(TimeFeature):
     """Day of year encoded as value between [-0.5, 0.5] translated by sin and cos"""
 
     def __call__(self, index: pd.DatetimeIndex) -> np.ndarray:
-        period = (index.dayofyear - 1) / 365.0 * (2*math.pi)
+        dayinyear = [365.0 if (i%400 == 0 or (i%100 != 0 and i%4 == 0)) else 364.0 for i in index.year]
+        
+        period = (index.dayofyear - 1) / dayinyear * (2*math.pi)
         return [np.sin(period)/2, np.cos(period)/2]
 
 
@@ -197,13 +207,13 @@ def time_features_from_frequency_str(freq_str: str) -> List[TimeFeature]:
             DayOfYear,
         ],
         WeatherOffset: [
+            SCMinuteOfDay,
             SCHourOfDay,
-            SCDayOfWeek,
-            SCDayOfMonth,
+            DayOfWeek,
+            DayOfMonth,
             SCDayOfYear
         ]
     }
-    freq_str = "Weather"
 
     if freq_str == "Weather":
         offset = WeatherOffset()
