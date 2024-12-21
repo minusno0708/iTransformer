@@ -101,7 +101,8 @@ class Exp_Long_Term_Forecast_Partial(Exp_Basic):
 
                 total_loss.append(loss)
         total_loss = np.average(total_loss)
-        self.model.train()
+        #self.model.train()
+        self.model.eval()
         return total_loss
 
     def train(self, setting):
@@ -128,7 +129,8 @@ class Exp_Long_Term_Forecast_Partial(Exp_Basic):
             iter_count = 0
             train_loss = []
 
-            self.model.train()
+            #self.model.train()
+            self.model.eval()
             epoch_time = time.time()
             for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(train_loader):
                 iter_count += 1
@@ -332,6 +334,7 @@ class Exp_Long_Term_Forecast_Partial(Exp_Basic):
 
         mae, mse, rmse, mape, mspe = metric(preds, trues)
         print('mse:{}, mae:{}'.format(mse, mae))
+        print('rmse:', rmse)
         f = open("result_long_term_forecast.txt", 'a')
         f.write(setting + "  \n")
         f.write('mse:{}, mae:{}'.format(mse, mae))

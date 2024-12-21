@@ -19,10 +19,10 @@ warnings.filterwarnings('ignore')
 data_columns = []
 model_name = ""
 
-verification = "1_4_2_2"
+verification = "no_train"
 
 is_write_details = False
-mult_var_graph_dim = [4, 2]
+mult_var_graph_dim = [7, 3]
 
 def set_model_name(name):
     global model_name
@@ -85,14 +85,18 @@ class Loss_Analyzer():
             print("shape: ", self.test_details.shape)
 
     def write_loss(self, title=""):
+        self.print_loss()
+
         path = f"results/{model_name}/loss/{verification}.jpg"
         make_dir(f"results/{model_name}/loss")
 
-        epochs = np.arange(1, self.train_loss.shape[0] + 1)
+        epochs = np.arange(0, self.train_loss.shape[0])
 
         plt.plot(epochs, self.train_loss, label='Train Loss')
         plt.plot(epochs, self.vali_loss, label='Vali Loss')
         plt.plot(epochs, self.test_loss, label='Test Loss')
+
+        #plt.ylim(0.2, 1.0)
 
         plt.xlabel('Epochs')
         plt.ylabel('Loss')
@@ -103,13 +107,13 @@ class Loss_Analyzer():
         plt.legend()
         plt.savefig(path)
 
-    def is_write_detailss(self, title=""):
+    def write_details(self, title=""):
         path = f"results/{model_name}/loss_details/{verification}.jpg"
         make_dir(f"results/{model_name}/loss_details")
 
         fig, ax = plt.subplots(mult_var_graph_dim[0], mult_var_graph_dim[1])
         for i, train, test in zip(range(self.train_details.shape[0]), self.train_details, self.test_details):
-            epochs = np.arange(1, train.shape[0] + 1)
+            epochs = np.arange(0, train.shape[0])
 
             ax[int(i/mult_var_graph_dim[1]), i%mult_var_graph_dim[1]].plot(epochs, train, label="Train")
             ax[int(i/mult_var_graph_dim[1]), i%mult_var_graph_dim[1]].plot(epochs, test, label="Test")
@@ -194,6 +198,11 @@ class Exp_Long_Term_Forecast(Exp_Basic):
     def __init__(self, args):
         super(Exp_Long_Term_Forecast, self).__init__(args)
         set_model_name(args.model_id)
+        if args.model == "DeepAR":
+            self.is_prob = True
+            args.loss = "NLL"
+        else:
+            self.is_prob = False
 
     def _build_model(self):
         model = self.model_dict[self.args.model].Model(self.args).float()
@@ -211,7 +220,10 @@ class Exp_Long_Term_Forecast(Exp_Basic):
         return model_optim
 
     def _select_criterion(self):
-        criterion = nn.MSELoss()
+        if self.args.loss == 'NLL':
+            criterion = nn.GaussianNLLLoss()
+        else:
+            criterion = nn.MSELoss()
         return criterion
 
     def vali(self, vali_data, vali_loader, criterion, loss_analyzer=None, scaler=None):
@@ -248,13 +260,20 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                     if self.args.output_attention:
                         outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)[0]
                     else:
-                        outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
+                        # ここで予測される
+                        if self.is_prob:
+                            outputs, var = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
+                        else:
+                            outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
                 f_dim = -1 if self.args.features == 'MS' else 0
                 outputs = outputs[:, -self.args.pred_len:, f_dim:]
                 batch_y = batch_y[:, -self.args.pred_len:, f_dim:].to(self.device)
 
                 pred = outputs.detach().cpu()
                 true = batch_y.detach().cpu()
+
+                if self.is_prob:
+                    var = var[:, -self.args.pred_len:, f_dim:].detach().cpu()
 
                 if loss_analyzer != None:
                     if pred_t.size == 0:
@@ -269,7 +288,10 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                         diff = loss_analyzer.get_detail_loss(pred_t, true_t)
                         loss_analyzer.details_append('test', diff)
 
-                loss = criterion(pred, true)
+                if self.args.loss == 'NLL':
+                    loss = criterion(pred, true, var)
+                else:
+                    loss = criterion(pred, true)
 
                 total_loss.append(loss)
 
@@ -280,6 +302,7 @@ class Exp_Long_Term_Forecast(Exp_Basic):
         total_loss = np.average(total_loss)
         
         self.model.train()
+    
         return total_loss
 
     def train(self, setting):
@@ -288,6 +311,11 @@ class Exp_Long_Term_Forecast(Exp_Basic):
         train_data, train_loader = self._get_data(flag='train')
         vali_data, vali_loader = self._get_data(flag='val')
         test_data, test_loader = self._get_data(flag='test')
+
+        print("train_loader", len(train_loader))
+        print("vali_loader", len(vali_loader))
+        print("test_loader", len(test_loader))
+        print("batch_size", self.args.batch_size) 
 
         if is_write_details:
             set_columns(train_data.columns)
@@ -311,10 +339,18 @@ class Exp_Long_Term_Forecast(Exp_Basic):
         if self.args.use_amp:
             scaler = torch.cuda.amp.GradScaler()
 
-        #for epoch in range(self.args.train_epochs):
-        for epoch in range(10):
+        for epoch in range(self.args.train_epochs):
+        #for epoch in range(1):
             iter_count = 0
             train_loss = []
+
+            """
+            vali_loss = self.vali(vali_data, vali_loader, criterion)  
+            if is_write_details:
+                test_loss = self.vali(test_data, test_loader, criterion, loss_analyzer, test_data.scaler)
+            else:
+                test_loss = self.vali(test_data, test_loader, criterion)
+            """
 
             self.model.train()
             epoch_time = time.time()
@@ -362,13 +398,20 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                     if self.args.output_attention:
                         outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)[0]
                     else:
-                        outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
+                        # ここで予測される
+                        if self.is_prob:
+                            outputs, var = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
+                        else:
+                            outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
 
                     f_dim = -1 if self.args.features == 'MS' else 0
                     outputs = outputs[:, -self.args.pred_len:, f_dim:]
                     batch_y = batch_y[:, -self.args.pred_len:, f_dim:].to(self.device)
 
-                    loss = criterion(outputs, batch_y)
+                    if self.args.loss == 'NLL':
+                        loss = criterion(outputs, batch_y, var)
+                    else:
+                        loss = criterion(outputs, batch_y)
                     train_loss.append(loss.item())
 
                 if (i + 1) % 100 == 0:
@@ -387,6 +430,7 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                     loss.backward()
                     model_optim.step()
 
+
                 pred = outputs.detach().cpu()
                 true = batch_y.detach().cpu()
 
@@ -403,11 +447,13 @@ class Exp_Long_Term_Forecast(Exp_Basic):
 
             print("Epoch: {} cost time: {}".format(epoch + 1, time.time() - epoch_time))
             train_loss = np.average(train_loss)
+          
             vali_loss = self.vali(vali_data, vali_loader, criterion)  
             if is_write_details:
                 test_loss = self.vali(test_data, test_loader, criterion, loss_analyzer, test_data.scaler)
             else:
                 test_loss = self.vali(test_data, test_loader, criterion)
+            
 
             # Lossを記録
             loss_analyzer.loss_append('train', train_loss)
@@ -441,7 +487,7 @@ class Exp_Long_Term_Forecast(Exp_Basic):
         loss_write_path = 'results/weather_day_pred/automn'
         loss_analyzer.write_loss()
         if is_write_details:
-            loss_analyzer.is_write_detailss()
+            loss_analyzer.write_details()
 
         return self.model
 
@@ -485,7 +531,11 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                         outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)[0]
 
                     else:
-                        outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
+                        # ここで予測される
+                        if self.is_prob:
+                            outputs, var = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
+                        else:
+                            outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
 
                 f_dim = -1 if self.args.features == 'MS' else 0
                 outputs = outputs[:, -self.args.pred_len:, f_dim:]
@@ -525,6 +575,7 @@ class Exp_Long_Term_Forecast(Exp_Basic):
 
         mae, mse, rmse, mape, mspe = metric(preds, trues)
         print('mse:{}, mae:{}'.format(mse, mae))
+        print('rmse:'.format(rmse))
         f = open("result_long_term_forecast.txt", 'a')
         f.write('mse:{}, mae:{}'.format(mse, mae))
         f.write('\n')
